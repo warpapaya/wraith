@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from playwright.async_api import async_playwright
+from playwright_stealth import Stealth
 
 from wraith.brokers import ALL_BROKERS, BrokerBase
 from wraith.checks import hibp as hibp_check
@@ -66,6 +67,7 @@ async def run_broker_checks(
                     )
                 )
                 page = await ctx.new_page()
+                await Stealth().apply_stealth_async(page)
 
                 try:
                     presence = await broker.check_presence(cfg.profile, page)

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/banner.svg" alt="wraith — vanish from the internet" width="100%"/>
+  <img src="assets/banner.png" alt="wraith — vanish from the internet" width="100%"/>
 </div>
 
 <div align="center">

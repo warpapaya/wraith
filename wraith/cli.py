@@ -118,12 +118,17 @@ def init():
 # ─── wraith audit ───────────────────────────────────────────────────────
 
 @app.command()
-def audit():
+def audit(
+    visible: bool = typer.Option(False, "--visible", help="Run with visible browser (bypasses bot detection)"),
+):
     """Run ALL checks and report current exposure."""
     cfg = _get_config()
     if not cfg.profile.names:
         console.print("[red]No profile configured. Run 'wraith init' first.[/red]")
         raise typer.Exit(1)
+
+    if visible:
+        cfg.settings.headless = False
 
     from wraith.audit import run_full_audit, display_audit_results
 
@@ -145,6 +150,7 @@ def scrub(
     broker: Optional[str] = typer.Option(None, "--broker", "-b", help="Single broker name"),
     all_brokers: bool = typer.Option(False, "--all", "-a", help="Run all brokers"),
     dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Navigate but do NOT submit"),
+    visible: bool = typer.Option(False, "--visible", help="Run with visible browser (bypasses bot detection)"),
 ):
     """Submit opt-out requests via browser automation."""
     if not broker and not all_brokers:
@@ -159,7 +165,10 @@ def scrub(
     from wraith.brokers import ALL_BROKERS, BROKER_MAP
     from wraith.brokers.base import SubmissionStatus
     from playwright.async_api import async_playwright
+    from playwright_stealth import Stealth
     from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+
+    headless = not visible and cfg.settings.headless
 
     if broker:
         broker_lower = broker.lower()
@@ -176,7 +185,7 @@ def scrub(
 
         try:
             async with async_playwright() as pw:
-                browser_instance = await pw.chromium.launch(headless=cfg.settings.headless)
+                browser_instance = await pw.chromium.launch(headless=headless)
 
                 with Progress(
                     SpinnerColumn(),
@@ -191,6 +200,22 @@ def scrub(
                         b = broker_cls()
                         progress.update(task, description=f"Processing {b.name}...")
 
+                        # Warn if broker needs visible browser but we're headless
+                        if b.requires_visible_browser and headless:
+                            console.print(
+                                f"  [yellow]{b.name}[/yellow]: Requires visible browser — "
+                                f"rerun with: wraith scrub --broker {b.name} --visible"
+                            )
+                            if not dry_run:
+                                await db.record_submission(
+                                    broker=b.name,
+                                    status="manual_required",
+                                    profile=cfg.profile,
+                                    notes="Requires --visible flag (Cloudflare protection).",
+                                )
+                            progress.advance(task)
+                            continue
+
                         ctx = await browser_instance.new_context(
                             user_agent=(
                                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -199,6 +224,7 @@ def scrub(
                             )
                         )
                         page = await ctx.new_page()
+                        await Stealth().apply_stealth_async(page)
 
                         try:
                             result = await b.submit_opt_out(cfg.profile, page, dry_run=dry_run)

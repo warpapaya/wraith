@@ -7,6 +7,7 @@ dependencies = [
     "typer[all]>=0.12",
     "rich>=13",
     "playwright>=1.40",
+    "playwright-stealth>=1.0.6",
     "httpx>=0.26",
     "aiosqlite>=0.19",
     "python-whois>=0.9",

@@ -16,6 +16,7 @@ class USPhoneBook(BrokerBase):
     name = "usphonebook"
     opt_out_url = "https://www.usphonebook.com/opt-out"
     manual_only = False
+    requires_visible_browser = True
 
     async def check_presence(self, profile: Profile, page: Page) -> bool | None:
         if not profile.primary_phone:
@@ -39,8 +40,12 @@ class USPhoneBook(BrokerBase):
     ) -> SubmissionResult:
         if not await self._safe_goto(page, self.opt_out_url):
             return SubmissionResult(
-                status=SubmissionStatus.FAILED,
-                notes="Could not load USPhoneBook opt-out page.",
+                status=SubmissionStatus.MANUAL_REQUIRED,
+                notes="Cloudflare blocked — use visible browser mode.",
+                manual_steps=[
+                    "Run: wraith scrub --broker usphonebook --visible",
+                    "Or visit https://www.usphonebook.com/opt-out manually.",
+                ],
             )
 
         try:

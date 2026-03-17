@@ -17,6 +17,7 @@ class FastPeopleSearch(BrokerBase):
     opt_out_url = "https://www.fastpeoplesearch.com/removal"
     search_url = "https://www.fastpeoplesearch.com/name/{name}_{state}"
     manual_only = False
+    requires_visible_browser = True
 
     async def check_presence(self, profile: Profile, page: Page) -> bool | None:
         name_slug = profile.primary_name.lower().replace(" ", "-")
@@ -36,10 +37,16 @@ class FastPeopleSearch(BrokerBase):
     async def submit_opt_out(
         self, profile: Profile, page: Page, dry_run: bool = False
     ) -> SubmissionResult:
+        # FastPeopleSearch uses Cloudflare — headless browsers are blocked.
+        # Check if we appear to be blocked (page won't load properly headless).
         if not await self._safe_goto(page, self.opt_out_url):
             return SubmissionResult(
-                status=SubmissionStatus.FAILED,
-                notes="Could not load removal page.",
+                status=SubmissionStatus.MANUAL_REQUIRED,
+                notes="Cloudflare blocked — use visible browser mode.",
+                manual_steps=[
+                    "Run: wraith scrub --broker fastpeoplesearch --visible",
+                    "Or visit https://www.fastpeoplesearch.com/removal manually.",
+                ],
             )
 
         # Step 1: Search for the record on the removal page

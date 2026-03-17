@@ -40,6 +40,7 @@ class BrokerBase(ABC):
     opt_out_url: str = ""
     manual_only: bool = False
     search_url: str = ""
+    requires_visible_browser: bool = False
 
     async def check_presence(self, profile: Profile, page: Page) -> bool | None:
         """Check if profile data is listed on this broker.

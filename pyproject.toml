@@ -1,0 +1,21 @@
+[project]
+name = "wraith"
+version = "0.1.0"
+description = "Personal privacy scrubbing engine"
+requires-python = ">=3.11"
+dependencies = [
+    "typer[all]>=0.12",
+    "rich>=13",
+    "playwright>=1.40",
+    "httpx>=0.26",
+    "aiosqlite>=0.19",
+    "python-whois>=0.9",
+    "tomli-w>=1.0",
+]
+
+[project.scripts]
+wraith = "wraith.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

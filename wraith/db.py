@@ -121,14 +121,14 @@ class WraithDB:
 
     async def get_all_submissions(self) -> list[dict[str, Any]]:
         cursor = await self.db.execute(
-            "SELECT * FROM submissions ORDER BY submitted_at DESC"
+            "SELECT * FROM submissions ORDER BY submitted_at DESC, id DESC"
         )
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
     async def get_submissions_by_broker(self, broker: str) -> list[dict[str, Any]]:
         cursor = await self.db.execute(
-            "SELECT * FROM submissions WHERE broker = ? ORDER BY submitted_at DESC",
+            "SELECT * FROM submissions WHERE broker = ? ORDER BY submitted_at DESC, id DESC",
             (broker,),
         )
         rows = await cursor.fetchall()
@@ -137,9 +137,15 @@ class WraithDB:
     async def get_due_resubmissions(self) -> list[dict[str, Any]]:
         now = datetime.utcnow().isoformat()
         cursor = await self.db.execute(
-            """SELECT * FROM submissions
-               WHERE resubmit_at <= ? AND status IN ('submitted', 'confirmed')
-               ORDER BY resubmit_at ASC""",
+            """SELECT s.* FROM submissions AS s
+               WHERE s.id = (
+                   SELECT latest.id FROM submissions AS latest
+                   WHERE latest.broker = s.broker
+                     AND latest.profile_hash IS s.profile_hash
+                   ORDER BY latest.submitted_at DESC, latest.id DESC LIMIT 1
+               )
+                 AND s.resubmit_at <= ? AND s.status IN ('submitted', 'confirmed')
+               ORDER BY s.resubmit_at ASC, s.submitted_at DESC, s.id DESC""",
             (now,),
         )
         rows = await cursor.fetchall()
@@ -147,7 +153,7 @@ class WraithDB:
 
     async def get_latest_submission(self, broker: str) -> dict[str, Any] | None:
         cursor = await self.db.execute(
-            "SELECT * FROM submissions WHERE broker = ? ORDER BY submitted_at DESC LIMIT 1",
+            "SELECT * FROM submissions WHERE broker = ? ORDER BY submitted_at DESC, id DESC LIMIT 1",
             (broker,),
         )
         row = await cursor.fetchone()

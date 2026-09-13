@@ -176,6 +176,8 @@ def mask_email(email: str) -> str:
         return "***"
     local, domain = email.split("@", 1)
     domain_parts = domain.split(".", 1)
+    if not local or not domain_parts[0]:
+        return "***"
     masked_local = local[0] + "***" + local[-1] if len(local) > 1 else local[0] + "***"
     masked_domain = domain_parts[0][0] + "*" * (len(domain_parts[0]) - 2) + domain_parts[0][-1] if len(domain_parts[0]) > 1 else domain_parts[0]
     suffix = "." + domain_parts[1] if len(domain_parts) > 1 else ""

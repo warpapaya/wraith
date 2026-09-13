@@ -424,7 +424,7 @@ def monitor():
 
 @app.command()
 def rescan():
-    """Resubmit opt-outs for brokers past their resubmission date."""
+    """Review due opt-out renewals and show instructions; does not submit."""
     cfg = _get_config()
 
     async def _rescan():
@@ -513,9 +513,13 @@ def hibp():
 
             for email, breaches in results.items():
                 masked = mask_email(email)
-                # Save to DB
-                real_breaches = [b for b in breaches if not b.get("Name", "").startswith("ERROR:")]
-                await db.save_breach_results(email, real_breaches)
+                if any(b.get("Name", "").startswith("ERROR:") for b in breaches):
+                    console.print(
+                        f"  [yellow]{masked}[/yellow]: Unavailable — lookup failed; "
+                        "saved results retained. Retry later."
+                    )
+                    continue
+                await db.save_breach_results(email, breaches)
 
                 if not breaches:
                     console.print(f"  [green]{masked}[/green]: No breaches found")
@@ -581,10 +585,11 @@ def whois_cmd():
             table.add_column("Action")
 
             for r in results:
-                await db.save_whois_result(r.domain, r.privacy_protected, r.exposed_fields)
+                if not r.error:
+                    await db.save_whois_result(r.domain, r.privacy_protected, r.exposed_fields)
 
                 if r.error:
-                    table.add_row(r.domain, "[yellow]Error[/yellow]", r.error, "Retry later")
+                    table.add_row(r.domain, "[yellow]Unavailable[/yellow]", r.error, "Retry later")
                 elif r.privacy_protected:
                     table.add_row(r.domain, "[green]Yes[/green]", "None", "None needed")
                 else:

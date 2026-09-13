@@ -106,9 +106,10 @@ async def run_hibp_check(
 
     # Save to DB
     for email, breaches in results.items():
-        # Filter out error entries for DB storage
-        real_breaches = [b for b in breaches if not b.get("Name", "").startswith("ERROR:")]
-        await db.save_breach_results(email, real_breaches)
+        # A failed/partial lookup must not replace the last successful result.
+        if any(b.get("Name", "").startswith("ERROR:") for b in breaches):
+            continue
+        await db.save_breach_results(email, breaches)
 
     return results
 
@@ -124,7 +125,8 @@ async def run_whois_check(
 
     # Save to DB
     for r in results:
-        await db.save_whois_result(r.domain, r.privacy_protected, r.exposed_fields)
+        if not r.error:
+            await db.save_whois_result(r.domain, r.privacy_protected, r.exposed_fields)
 
     return results
 
@@ -189,7 +191,11 @@ def display_audit_results(result: AuditResult) -> None:
         for email, breaches in result.breach_results.items():
             masked = mask_email(email)
             count = len(breaches)
-            if count > 0:
+            if any(b.get("Name", "").startswith("ERROR:") for b in breaches):
+                style = "yellow"
+                names = "Unavailable"
+                action = "Lookup failed — retry; saved results retained"
+            elif count > 0:
                 style = "red" if count > 3 else "yellow"
                 names = ", ".join(b.get("Name", "?")[:20] for b in breaches[:5])
                 if count > 5:
@@ -215,7 +221,7 @@ def display_audit_results(result: AuditResult) -> None:
 
         for r in result.whois_results:
             if r.error:
-                whois_table.add_row(r.domain, "[yellow]Error[/yellow]", r.error, "Retry")
+                whois_table.add_row(r.domain, "[yellow]Unavailable[/yellow]", r.error, "Retry")
             elif r.privacy_protected:
                 whois_table.add_row(r.domain, "[green]Yes[/green]", "None", "None")
             else:

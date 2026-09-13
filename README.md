@@ -15,284 +15,99 @@
 
 ---
 
-Wraith is a command-line privacy engine that automates the tedious process of removing your personal information from the internet. It handles data broker opt-outs via browser automation, monitors for breach exposure, audits domain WHOIS privacy, and tracks the 90-day re-submission cycle so you don't have to.
+Wraith is an experimental command-line privacy tool: it attempts data-broker opt-outs with Playwright, checks email breach exposure through HaveIBeenPwned (HIBP), audits WHOIS privacy, and stores results and renewal dates in SQLite.
 
-```
-$ wraith scrub --all
-
- Scrubbing 13 data brokers...
-
- ✓  FastPeopleSearch    submitted
- ✓  BeenVerified        submitted
- ✓  Spokeo              submitted
- ✓  Intelius            submitted
- ✓  PeopleFinder        submitted
- ✓  TruthFinder         submitted
- ✓  ThatsThem           submitted
- ✓  CheckPeople         submitted
- ✓  USPhoneBook         submitted
- ✓  InstantCheckMate    submitted
- ⚠  Whitepages          manual required — phone verification needed
- ⚠  MyLife              manual required — see instructions
- ✓  Radaris             submitted
-
- 13/13 brokers processed · 11 submitted · 2 manual required
- Next rescan: 2026-06-16
-```
-
----
-
-## Features
-
-- **🕵️ Browser automation** — Playwright navigates opt-out forms automatically so you don't have to
-- **📊 State tracking** — SQLite database tracks every submission: pending, confirmed, failed, manual
-- **🔄 90-day cycle** — `wraith rescan` resubmits automatically when brokers are due (they re-add you)
-- **🔐 Breach monitoring** — Checks all your emails against HaveIBeenPwned v3
-- **🌐 WHOIS auditing** — Flags domains where your real contact info is publicly visible
-- **🔍 Google removal** — Generates pre-filled checklists for content removal, personal info requests, and Street View blur
-- **🎭 Dry run mode** — `--dry-run` navigates without submitting, for verification
-- **🔒 Privacy-first** — Profile data never appears in logs; masked output only (`P***e C***k`)
-
----
-
-## Brokers Covered
-
-| Broker | Method | Auto? |
-|--------|--------|-------|
-| FastPeopleSearch | Form + email verify | ✅ (pauses for email) |
-| BeenVerified | Form + email | ✅ |
-| Spokeo | URL opt-out + email | ✅ |
-| Intelius | Form + email | ✅ |
-| PeopleFinder | Email form | ✅ |
-| TruthFinder | Email form | ✅ |
-| InstantCheckMate | Email form | ✅ |
-| ThatsThem | Form | ✅ |
-| CheckPeople | Form | ✅ |
-| USPhoneBook | Form | ✅ |
-| Radaris | Email/account | ⚠️ Manual instructions |
-| Whitepages | Phone verify | ⚠️ Manual instructions |
-| MyLife | Complex flow | ⚠️ Manual instructions |
-
-> **⚠️ Manual required** means wraith automates everything up to the point where a phone number or ID verification is required, then pauses and gives you step-by-step instructions.
-
----
+**Broker automation is unverified, not a removal guarantee.** Sites change, CAPTCHAs and verification steps can block progress, and a missing page selector does not prove your record is absent. Some flows record `submitted` after a click without verifying the site's response. Manually verify matches, submissions, email confirmations, and eventual removal; do not treat `not_found` or `submitted` as proof.
 
 ## Installation
 
-**Prerequisites:** Python 3.11+, git
+Requires Python 3.11+ and git.
 
 ```bash
-# Clone the repo
-git clone https://github.com/yourusername/wraith.git
+git clone https://github.com/warpapaya/wraith.git
 cd wraith
-
-# Create virtualenv and install
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
-
-# Install Playwright's Chromium browser
 playwright install chromium
-
-# Verify
 wraith --help
 ```
 
----
+Chromium is needed for browser commands, not for the offline test suite.
 
-## Quick Start
-
-### 1. Configure your profile
+## Usage
 
 ```bash
-wraith init
+wraith init                            # Interactive profile setup
+wraith audit                           # Broker, HIBP, and WHOIS checks
+wraith scrub --broker Spokeo --dry-run  # Inspect an experimental flow
+wraith scrub --all                     # Attempt opt-outs; may prompt for manual action
+wraith status                          # View recorded submission history
+wraith monitor                         # Re-check broker presence
+wraith rescan                          # Review due renewals and show instructions only
+wraith hibp                            # Email breach lookup (paid HIBP key required)
+wraith whois                           # WHOIS privacy checks
+wraith google                          # Generate removal-action URL checklist
 ```
 
-This interactive wizard collects:
-- Your name(s) and name variants
-- Current and previous addresses
-- Phone numbers
-- Email addresses
-- Date of birth (optional, improves broker search accuracy)
-- Domain names to audit for WHOIS privacy
+`--dry-run` avoids opt-out submission but still visits external sites. Review broker behavior before using real personal data. Included modules cover FastPeopleSearch, BeenVerified, Spokeo, Intelius, PeopleFinder, TruthFinder, InstantCheckMate, ThatsThem, CheckPeople, USPhoneBook, Radaris, Whitepages, and MyLife. Some provide manual instructions rather than automated removal.
 
-Profile is saved to `~/.wraith/config.toml`. Sensitive fields are never logged.
+### Renewals are manual
 
-### 2. Audit your exposure
+`wraith rescan` lists due records and can prompt before printing suggested scrub commands. It **does not automatically resubmit** anything. Review each broker and profile before running a suggested command; `scrub` uses the currently configured profile, not a historical profile from the database. Use a calendar reminder rather than unattended cron for this interactive workflow.
 
-```bash
-wraith audit
-```
-
-Runs all checks and shows a full exposure report:
-- Data broker presence (where checkable)
-- Breach exposure across all emails
-- WHOIS privacy status on all domains
-
-### 3. Scrub everything
-
-```bash
-wraith scrub --all
-```
-
-Submits opt-out requests to all 13 brokers. For brokers requiring manual intervention, wraith pauses and gives you clear instructions before continuing.
-
-### 4. Check status
-
-```bash
-wraith status
-```
-
-Shows all tracked submissions with color coding:
-- 🟢 **green** — confirmed removed
-- 🟡 **yellow** — submitted, awaiting confirmation
-- 🔴 **red** — failed or overdue
-- 🔵 **blue** — manual action required
-
-### 5. Set a calendar reminder for 90 days out
-
-```bash
-wraith rescan
-```
-
-Re-submits any broker that's past its 90-day resubmission date. Data brokers re-harvest your information from public records — this is a maintenance job, not a one-time fix.
-
----
-
-## All Commands
-
-```
-wraith init          Interactive profile setup wizard
-wraith audit         Full exposure report (all sources)
-wraith scrub         Submit opt-out requests via browser automation
-  --all              Run all brokers
-  --broker NAME      Run a single broker by name
-  --dry-run          Navigate to forms without submitting
-wraith status        Show all submission statuses
-wraith monitor       Re-check brokers for profile reappearance
-wraith rescan        Resubmit opt-outs due for renewal (90-day cycle)
-wraith hibp          Check emails against HaveIBeenPwned
-wraith whois         Audit WHOIS privacy on all configured domains
-wraith google        Generate Google removal URL checklist
-```
-
----
+Only the latest attempt for each broker/profile hash is eligible for renewal, and only when its status is `submitted` or `confirmed` and its renewal date is due. Legacy records without a profile hash form a separate group per broker. History remains available; a newer failed, manual, or not-found attempt suppresses an older due success. The existing profile hash is based on names and emails, not every profile field.
 
 ## Configuration
 
-Config file: `~/.wraith/config.toml`
+`wraith init` saves the profile and API key in `~/.wraith/config.toml`. The default database is `~/.wraith/state.db`.
 
 ```toml
 [profile]
-names = ["Your Name", "Y. Name"]
-dob = "1990-01-15"            # Optional — improves accuracy
-phones = ["+15555555555"]
+names = ["Your Name"]
+dob = ""                          # Optional
+phones = ["+15555550123"]
 emails = ["you@example.com"]
 addresses = [
     { street = "123 Main St", city = "Anytown", state = "GA", zip = "30000" }
 ]
-domains = ["yourdomain.com"]
+domains = ["example.com"]
 
 [api_keys]
-hibp = ""                     # Optional — get free key at haveibeenpwned.com/API/Key
+hibp = ""                         # Paid subscription key for email breach checks
 
 [settings]
-headless = true               # Set false to watch the browser work
-resubmit_days = 90            # Days before resubmitting opt-outs
-confirm_wait_days = 30        # Days to wait before confirming removal
+headless = true
+resubmit_days = 90
+confirm_wait_days = 30
 db_path = "~/.wraith/state.db"
 ```
 
-### HIBP API Key (Optional)
+### HIBP access and failed lookups
 
-The HaveIBeenPwned `/breachedaccount` endpoint requires a paid API key ($3.50/month or a one-time lookup fee). Without it, `wraith hibp` will output instructions for getting one. The public domain search still works without a key.
+The HIBP [`breachedaccount` API](https://haveibeenpwned.com/API/v3) requires a paid subscription key. Get one and review current terms at https://haveibeenpwned.com/API/Key. Without a key, Wraith skips HIBP checks in an audit and the standalone command shows setup instructions; this does not mean an email is breach-free.
 
-Get a key at: https://haveibeenpwned.com/API/Key
+Failed HIBP and WHOIS lookups are shown as **unavailable** and retain previously saved successful results. Those saved results may be stale. A successful empty HIBP response replaces prior breach results for that email; it only means HIBP returned no breaches for that lookup.
 
----
+## Privacy and limitations
 
-## How It Works
+- Configuration and SQLite history are stored locally, **not encrypted by Wraith**. Treat both as sensitive files and protect access and backups yourself.
+- Checks send information to external services: broker sites, HIBP (email addresses), and WHOIS services (domains). Opening generated Google URLs also contacts Google.
+- Some output uses masking, but masking is not universal. Instructions, URLs, lookup errors, and third-party responses can contain personal data. Review terminal captures and logs before sharing.
+- Wraith does not automatically handle all email confirmations, CAPTCHAs, phone verification, or ID requests. Do not submit identity documents without reviewing the recipient and requirements.
+- WHOIS privacy detection is heuristic. Verify results with your registrar. Broker removal cannot erase source public records, court records, news articles, or all search-engine results.
 
-### Browser Automation
-
-Wraith uses [Playwright](https://playwright.dev/) to control a headless Chromium browser. For each data broker, it:
-
-1. Navigates to the opt-out URL
-2. Searches for your profile using name + state/city
-3. Identifies matching records
-4. Submits the removal form
-5. Records the result in SQLite
-
-Where sites use CAPTCHAs, phone verification, or ID uploads, wraith automates everything possible and hands off the remaining steps to you with clear instructions.
-
-### State Machine
-
-Every broker submission goes through a lifecycle:
-
-```
-→ submitted → confirmed
-             ↘ failed
-             ↘ manual_required
-→ skipped
-
-After 90 days: submitted/confirmed → due for rescan
-```
-
-### The Re-Harvest Problem
-
-Data brokers continuously re-harvest your information from public records (property tax rolls, voter registration, court filings). A single opt-out is not permanent. Wraith's 90-day rescan cycle (`wraith rescan`) handles this automatically — run it as a quarterly task or add it to a cron job:
+## Development
 
 ```bash
-# Quarterly rescan (add to crontab)
-0 9 1 */3 * cd /path/to/wraith && .venv/bin/wraith rescan
+pip install -e '.[dev]'
+python -m pytest -q
+python -m build
 ```
 
----
+Tests use temporary HOME directories and SQLite databases, fake lookup responses, and block Python socket network access. No browser installation, credentials, or live services are needed. GitHub Actions runs the offline suite on Python 3.11 and 3.12. These tests do **not** validate live broker selectors or successful removals.
 
-## Privacy & Security
-
-- **Local only** — no data leaves your machine (except to the broker sites you're opting out of)
-- **No telemetry** — zero analytics, zero tracking
-- **Masked output** — sensitive profile data is never displayed in plaintext in logs or terminal output
-- **Profile stored locally** — `~/.wraith/config.toml` — treat it like a password file
-
----
-
-## What Wraith Can't Do
-
-| Limitation | Why |
-|-----------|-----|
-| Public property records | Legally public — source of broker re-harvest |
-| Court records | Require legal process to seal/expunge |
-| News articles & blog posts | Require direct contact with site owner |
-| Voter registration (some states) | Some states allow suppression requests — see your state's process |
-| Google search index (organic) | Use `wraith google` for removal request URLs |
-
----
-
-## Roadmap
-
-- [ ] Email confirmation automation (auto-click verification links)
-- [ ] Tor/proxy support for scrub submissions
-- [ ] Scheduled cron mode (`wraith schedule`)
-- [ ] More brokers (targeting 50+)
-- [ ] Noise generation module (submit decoy data to non-removable profiles)
-- [ ] Web UI (local dashboard)
-- [ ] DeleteMe/Kanary import (migrate existing service tracking)
-
----
-
-## Contributing
-
-PRs welcome, especially:
-
-- New broker modules (copy `wraith/brokers/base.py`, implement `check_presence` and `submit_opt_out`)
-- Updated opt-out flows (broker sites change layouts regularly)
-- Bug reports with site-specific failures
-
-See `wraith/brokers/base.py` for the broker interface.
-
----
+Contributions and reproducible bug reports are welcome. See `wraith/brokers/base.py` for the broker interface; omit personal information from reports.
 
 ## License
 
